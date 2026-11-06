@@ -15,5 +15,6 @@
     [view]="options().view ?? 'dm'"
     [theme]="options().theme ?? 'stone'"
     [showGrid]="options().grid ?? true"
+    (markerAction)="toggleMarker($event)"
   />
 </div>

@@ -14,7 +14,8 @@ export enum Tile {
   CORRIDOR = 2,
   SECRET_TILE = 3, // porta secreta (só aparece na visão do mestre)
   HAZARD_TILE = 4, // perigo: poço, lava, água gelada... (passável, mas perigoso)
-  PILLAR = 5, // pilar / estalagmite (bloqueia movimento)
+  PILLAR = 5, // pilar / estalagmite / árvore (bloqueia movimento)
+  ROAD = 6, // estrada de terra (só floresta)
 }
 
 export const DIRS4: readonly (readonly [number, number])[] = [
@@ -41,7 +42,8 @@ export type MarkerType =
   | 'stairs_down' // saída
   | 'chest'
   | 'trap'
-  | 'encounter';
+  | 'encounter'
+  | 'camp';
 
 export interface Marker extends Point {
   type: MarkerType;
@@ -119,10 +121,21 @@ export const THEMES: Record<string, Theme> = {
     door: [70, 40, 24],
     hazard_name: 'lava',
   },
+  forest: {
+    name: 'Floresta',
+    background: [196, 214, 170],
+    floor: [226, 238, 192],
+    grid: [168, 188, 128],
+    ink: [26, 42, 20],
+    hatch: [62, 92, 50],
+    danger: [66, 110, 70],
+    door: [110, 80, 42],
+    hazard_name: 'águas',
+  },
 };
 
 export interface Config {
-  layout?: 'dungeon' | 'cave';
+  layout?: 'dungeon' | 'cave' | 'forest';
   theme?: string;
   /** alias de theme (usado se theme não for informado) */
   environment?: string;
@@ -139,6 +152,7 @@ export interface Config {
   seed?: number; // mesma seed + mesma config = mesmo mapa
   locked_doors?: number;
   traps?: number;
+  exits?: number; // nº total de saídas da estrada (só floresta: 2..6)
   encounters?: boolean;
   level?: number; // nível do grupo (define a CD das armadilhas)
   group?: number; // nº de jogadores (define nº de monstros)
@@ -150,7 +164,7 @@ export interface Config {
 }
 
 export interface ResolvedConfig {
-  layout: 'dungeon' | 'cave';
+  layout: 'dungeon' | 'cave' | 'forest';
   theme: string;
   width: number;
   height: number;
@@ -165,6 +179,7 @@ export interface ResolvedConfig {
   seed: number;
   locked_doors: number;
   traps: number;
+  exits: number;
   encounters: boolean;
   level: number;
   group: number;
@@ -181,6 +196,8 @@ export interface MapData {
   markers: Marker[];
   start: Point;
   exit: Point;
+  /** Saídas extra da estrada (só floresta), além de `exit`. */
+  exits: Point[];
   config: ResolvedConfig;
 }
 
@@ -470,7 +487,7 @@ function largestRegion(m: number[][]): Point[] {
   return largest;
 }
 
-function makeCave(g: Tile[][], rng: Random): void {
+function makeCave(g: Tile[][], rng: Random, fill = 0.48): void {
   const H = g.length;
   const W = g[0].length;
   let best: Point[] = [];
@@ -479,7 +496,7 @@ function makeCave(g: Tile[][], rng: Random): void {
     // 1 = parede, 0 = chão
     let m: number[][] = Array.from({ length: H }, (_, y) =>
       Array.from({ length: W }, (_, x) =>
-        x === 0 || x === W - 1 || y === 0 || y === H - 1 || rng.next() < 0.48 ? 1 : 0,
+        x === 0 || x === W - 1 || y === 0 || y === H - 1 || rng.next() < fill ? 1 : 0,
       ),
     );
     for (let k = 0; k < 4; k++) {
@@ -510,6 +527,69 @@ function makeCave(g: Tile[][], rng: Random): void {
     }
   }
   for (const { x, y } of best) g[y][x] = Tile.ROOM_TILE;
+}
+
+// ---------------------------------------------------------------------------
+// Estrada (só floresta): caminho mais curto entre entrada e saída,
+// alargado para 1–2 células. Segue o chão já aberto (clareiras),
+// por isso nunca atravessa parede — e nunca é removido depois:
+// perigos/pilares só ocupam ROOM_TILE, nunca ROAD.
+// ---------------------------------------------------------------------------
+
+function carveRoad(g: Tile[][], rng: Random, start: Point, exit: Point): Point[] {
+  const W = g[0].length;
+  const dist = bfs(g, start.x, start.y);
+  if (dist[keyOf(exit, W)] < 0) return []; // inalcançável: não há estrada
+
+  // Reconstrói o caminho descendo o gradiente de distâncias até a entrada.
+  const path: Point[] = [];
+  let cur = exit;
+  while (cur.x !== start.x || cur.y !== start.y) {
+    path.push(cur);
+    const d = dist[keyOf(cur, W)];
+    const next = DIRS4.map(([dx, dy]) => ({ x: cur.x + dx, y: cur.y + dy })).find(
+      (p) => p.x >= 0 && p.y >= 0 && p.x < W && p.y < g.length && dist[keyOf(p, W)] === d - 1,
+    );
+    if (!next) return []; // não deveria acontecer; seguro
+    cur = next;
+  }
+  path.push(start);
+  path.reverse();
+
+  for (const p of path) {
+    if (g[p.y][p.x] === Tile.ROOM_TILE) g[p.y][p.x] = Tile.ROAD;
+  }
+  // Alarga: célula vizinha perpendicular ao sentido de marcha, quando aberta.
+  for (let i = 1; i < path.length; i++) {
+    if (!rng.chance(0.6)) continue;
+    const a = path[i - 1];
+    const b = path[i];
+    const perp: Point =
+      a.x !== b.x ? { x: b.x, y: b.y + (rng.chance(0.5) ? 1 : -1) } : { x: b.x + (rng.chance(0.5) ? 1 : -1), y: b.y };
+    if (g[perp.y]?.[perp.x] === Tile.ROOM_TILE) g[perp.y][perp.x] = Tile.ROAD;
+  }
+  return path;
+}
+
+/** Ponto aberto mais próximo da borda indicada, a partir de `from`. */
+function edgeTarget(
+  g: Tile[][],
+  from: Point,
+  edge: 'north' | 'south' | 'west' | 'east',
+  exclude: Point[] = [],
+): Point {
+  const openTiles = collectTiles(g, isOpen).filter(
+    (p) => !exclude.some((e) => e.x === p.x && e.y === p.y),
+  );
+  const better = (a: Point, b: Point): boolean => {
+    switch (edge) {
+      case 'north': return a.y < b.y || (a.y === b.y && Math.abs(a.x - from.x) < Math.abs(b.x - from.x));
+      case 'south': return a.y > b.y || (a.y === b.y && Math.abs(a.x - from.x) < Math.abs(b.x - from.x));
+      case 'west': return a.x < b.x || (a.x === b.x && Math.abs(a.y - from.y) < Math.abs(b.y - from.y));
+      case 'east': return a.x > b.x || (a.x === b.x && Math.abs(a.y - from.y) < Math.abs(b.y - from.y));
+    }
+  };
+  return openTiles.reduce((best, p) => (better(p, best) ? p : best));
 }
 
 // ---------------------------------------------------------------------------
@@ -559,7 +639,7 @@ function placePillars(
   g: Tile[][],
   rng: Random,
   rooms: Rect[],
-  layout: 'dungeon' | 'cave',
+  layout: 'dungeon' | 'cave' | 'forest',
   protect: Set<number>,
   start: Point,
 ): void {
@@ -579,9 +659,10 @@ function placePillars(
       tryPillar({ x: r.x + r.w - 2, y: r.y + r.h - 2 });
     }
   } else {
-    // Estalagmites: só em pontos "abertos", para não estreitar passagens
+    // Estalagmites (caverna) / árvores (floresta): só em pontos "abertos",
+    // para não estreitar passagens. Floresta é mais densa.
     const floor = collectTiles(g, (t) => t === Tile.ROOM_TILE);
-    const count = Math.floor(floor.length * 0.012);
+    const count = Math.floor(floor.length * (layout === 'forest' ? 0.03 : 0.012));
     for (let i = 0; i < count * 6 && floor.length; i++) {
       const p = rng.pick(floor);
       const open4 = DIRS4.every(([dx, dy]) => g[p.y + dy]?.[p.x + dx] === Tile.ROOM_TILE);
@@ -596,6 +677,39 @@ function monstersFor(rng: Random, group: number, difficulty: string): number {
   return clamp(Math.round(group * m) + rng.nextInt(-1, 2), 1, 12);
 }
 
+/** Nº de monstros de um encontro colocado manualmente (sem variação da seed). */
+export function manualEncounterSize(group: number, difficulty: string): number {
+  const mult: Record<string, number> = { easy: 0.75, medium: 1, hard: 1.5, deadly: 2 };
+  return clamp(Math.round(group * (mult[difficulty] ?? 1)), 1, 12);
+}
+
+/** CD de uma armadilha colocada manualmente (mesma fórmula da geração automática). */
+export function manualTrapDC(level: number, difficulty: string): number {
+  const bonus: Record<string, number> = { easy: 0, medium: 1, hard: 2, deadly: 3 };
+  return 10 + Math.ceil(clamp(level, 1, 20) / 2) + (bonus[difficulty] ?? 1);
+}
+
+/** Tipos de marcador que podem ser colocados/removidos manualmente (menu do botão direito). */
+export const MANUAL_MARKERS: readonly MarkerType[] = ['encounter', 'camp', 'chest', 'trap'];
+
+/**
+ * Pode um marcador `type` ser colocado/removido manualmente em `p`?
+ * Sim se o quadrado for aberto (não parede/pilar) e não estiver ocupado
+ * por outro marcador (baú, armadilha, porta, entrada/saída...).
+ * Um quadrado que já tem um marcador do mesmo tipo também retorna true
+ * — clicar nele o remove.
+ */
+export function canToggleMarker(map: MapData, p: Point, type: MarkerType): boolean {
+  if (p.x < 0 || p.y < 0 || p.x >= map.width || p.y >= map.height) return false;
+  if (!isOpen(map.grid[p.y][p.x])) return false;
+  return map.markers.every((m) => m.x !== p.x || m.y !== p.y || m.type === type);
+}
+
+/** Atalho para encontros (compatibilidade com o uso anterior). */
+export function canToggleEncounter(map: MapData, p: Point): boolean {
+  return canToggleMarker(map, p, 'encounter');
+}
+
 // ---------------------------------------------------------------------------
 // API principal
 // ---------------------------------------------------------------------------
@@ -607,7 +721,7 @@ function resolveConfig(input: Config): ResolvedConfig {
   }
   const themeName = c.theme ?? c.environment ?? 'stone';
   return {
-    layout: c.layout === 'cave' ? 'cave' : 'dungeon',
+    layout: c.layout === 'cave' || c.layout === 'forest' ? c.layout : 'dungeon',
     theme: THEMES[themeName] ? themeName : 'stone',
     width: clamp(c.width ?? 40, 16, 150),
     height: clamp(c.height ?? 30, 16, 150),
@@ -622,6 +736,7 @@ function resolveConfig(input: Config): ResolvedConfig {
     seed: c.seed !== undefined ? c.seed >>> 0 : (Math.random() * 0xffffffff) >>> 0,
     locked_doors: clamp(c.locked_doors ?? 0, 0, 30),
     traps: clamp(c.traps ?? 0, 0, 60),
+    exits: clamp(c.exits ?? 4, 2, 6),
     encounters: c.encounters ?? false,
     level: clamp(c.level ?? 1, 1, 20),
     group: clamp(c.group ?? 4, 1, 10),
@@ -643,6 +758,9 @@ export function generate(config: Config = {}): MapData {
   let rooms: Rect[] = [];
   if (isDungeon) {
     rooms = makeDungeon(g, rng, cfg.rooms, 1 + Math.floor(cfg.rooms / 5) + cfg.secrets);
+  } else if (cfg.layout === 'forest') {
+    // Como a caverna (autômato celular), mas com chão mais aberto (clareiras)
+    makeCave(g, rng, 0.42);
   } else {
     makeCave(g, rng);
   }
@@ -672,6 +790,7 @@ export function generate(config: Config = {}): MapData {
   // 3) Entrada e saída (o mais distantes possível)
   let start: Point;
   let exit: Point;
+  let extraExits: Point[] = [];
   let startRoom: Rect | undefined;
   if (isDungeon && rooms.length >= 2) {
     startRoom = rng.pick(rooms);
@@ -688,6 +807,34 @@ export function generate(config: Config = {}): MapData {
       }
     }
     exit = center(exitRoom);
+  } else if (cfg.layout === 'forest') {
+    // Entrada/saída nas bordas opostas (oeste/leste), perto do centro
+    // vertical: é por onde a estrada atravessa a floresta.
+    const openTiles = collectTiles(g, isOpen);
+    const midY = H / 2;
+    start = openTiles.reduce((best, p) =>
+      p.x < best.x || (p.x === best.x && Math.abs(p.y - midY) < Math.abs(best.y - midY)) ? p : best,
+    );
+    exit = openTiles.reduce((best, p) =>
+      p.x > best.x || (p.x === best.x && Math.abs(p.y - midY) < Math.abs(best.y - midY)) ? p : best,
+    );
+    const mainRoad = carveRoad(g, rng, start, exit);
+    // Saídas extra: ramais da estrada principal para as outras bordas
+    // (ordem das bordas embaralhada com a seed). `exits` conta a saída
+    // principal (leste), por isso os ramais são exits - 1.
+    const extra = Math.max(0, cfg.exits - 1);
+    const edges: ('north' | 'south' | 'west' | 'east')[] = rng.shuffle(['north', 'south', 'west', 'east'] as const);
+    for (let i = 0; i < extra && mainRoad.length > 4; i++) {
+      const at = Math.min(
+        mainRoad.length - 2,
+        Math.max(1, Math.round(((i + 1) * mainRoad.length) / (extra + 1)) + rng.nextInt(-3, 4)),
+      );
+      const from = mainRoad[at];
+      const target = edgeTarget(g, from, edges[i % edges.length], [start, exit, ...extraExits]);
+      if ((target.x === start.x && target.y === start.y) || (target.x === exit.x && target.y === exit.y)) continue;
+      if (extraExits.some((e) => e.x === target.x && e.y === target.y)) continue;
+      if (carveRoad(g, rng, from, target).length > 2) extraExits.push(target);
+    }
   } else {
     const any = rng.pick(collectTiles(g, isOpen));
     const a = farthest(bfs(g, any.x, any.y), W);
@@ -697,8 +844,13 @@ export function generate(config: Config = {}): MapData {
   }
   markers.push({ type: 'stairs_up', ...start });
   markers.push({ type: 'stairs_down', ...exit });
+  for (const e of extraExits) markers.push({ type: 'stairs_down', ...e });
 
-  const protect = new Set<number>([keyOf(start, W), keyOf(exit, W)]);
+  const protect = new Set<number>([
+    keyOf(start, W),
+    keyOf(exit, W),
+    ...extraExits.map((e) => keyOf(e, W)),
+  ]);
   const occupied = new Set<number>(protect);
   for (const d of doors) occupied.add(keyOf(d, W));
 
@@ -747,7 +899,7 @@ export function generate(config: Config = {}): MapData {
         collectTiles(
           g,
           (t, x, y) =>
-            (t === Tile.ROOM_TILE || t === Tile.CORRIDOR) &&
+            (t === Tile.ROOM_TILE || t === Tile.CORRIDOR || t === Tile.ROAD) &&
             !occupied.has(y * W + x) &&
             Math.abs(x - start.x) + Math.abs(y - start.y) >= 4,
         ),
@@ -790,5 +942,5 @@ export function generate(config: Config = {}): MapData {
     }
   }
 
-  return { grid: g, width: W, height: H, rooms, doors, markers, start, exit, config: cfg };
+  return { grid: g, width: W, height: H, rooms, doors, markers, start, exit, exits: extraExits, config: cfg };
 }

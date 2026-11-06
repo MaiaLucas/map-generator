@@ -1,10 +1,14 @@
 # Dungeon Map Generator
 
-Gerador de mapas procedurais de dungeons em estilo masmorra de pedra para jogos de RPG.
+Gerador de mapas procedurais de dungeons, cavernas e florestas para jogos de RPG.
 
 ## Funcionalidades
 
 - **Geração procedural**: Cria mapas aleatórios com seed determinista para replayabilidade
+- **Três tipos de mapa**: Masmorra (salas e corredores), Caverna (orgânica, por autômato celular) e Floresta (clareiras orgânicas como a caverna, com estrada de terra atravessando de oeste a leste e árvores)
+- **Saídas da estrada (floresta)**: de 2 a 6 saídas — a principal a leste mais ramais para as outras bordas, cada uma marcada como Saída
+- **Encontros manuais**: clique com o botão direito num quadrado aberto do mapa para abrir o menu de ações e colocar um encontro lá (nº de monstros conforme Jogadores/Dificuldade); no mesmo quadrado, o menu passa a oferecer “Remover Encontro”. Sobrevivem a uma nova geração enquanto o quadrado continuar aberto
+- **Marcadores manuais**: no mesmo menu do botão direito — Acampamento (tenda, visível também para jogadores), Tesouro (baú) e Armadilha (CD conforme Nível/Dificuldade) — clique para colocar, clique de novo para remover
 - **Controles**: Defina quantidade de salas, salas secretas e encontros
 - **Conectividade linear**: Cada sala tem exatamente uma entrada e saída (exceto secretas)
 - **Portas**: Representação visual nas paredes das conexões (trancadas/destrancadas)

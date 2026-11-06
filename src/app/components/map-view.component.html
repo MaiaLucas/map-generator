@@ -5,6 +5,7 @@
     [attr.viewBox]="'0 0 ' + svgWidth() + ' ' + svgHeight()"
     xmlns="http://www.w3.org/2000/svg"
     font-family="system-ui, sans-serif"
+    (contextmenu)="onContextMenu($event)"
   >
     <!-- Ícones reutilizados no mapa e na legenda -->
     <ng-template #icon let-k="kind" let-x="x" let-y="y" let-v="vertical" let-n="value" let-s="size">
@@ -46,8 +47,20 @@
         @if (n !== undefined && n !== null) {
           <text [attr.x]="x" [attr.y]="y" text-anchor="middle" dominant-baseline="central" [attr.font-size]="s * 0.4" font-weight="700" fill="#fff">{{ n }}</text>
         }
+      } @else if (k === 'camp') {
+        <polygon [attr.points]="(x - s * 0.36) + ',' + (y + s * 0.3) + ' ' + x + ',' + (y - s * 0.34) + ' ' + (x + s * 0.36) + ',' + (y + s * 0.3)" [attr.fill]="colors().door" [attr.stroke]="colors().ink" [attr.stroke-width]="s * 0.06" />
+        <polygon [attr.points]="(x - s * 0.13) + ',' + (y + s * 0.3) + ' ' + x + ',' + (y - s * 0.02) + ' ' + (x + s * 0.13) + ',' + (y + s * 0.3)" [attr.fill]="colors().ink" />
+        <line [attr.x1]="x" [attr.x2]="x" [attr.y1]="y - s * 0.34" [attr.y2]="y - s * 0.44" [attr.stroke]="colors().ink" [attr.stroke-width]="s * 0.04" />
       } @else if (k === 'pillar') {
-        <circle [attr.cx]="x" [attr.cy]="y" [attr.r]="s * 0.3" [attr.fill]="colors().pillar" [attr.stroke]="colors().ink" [attr.stroke-width]="s * 0.06" />
+        @if (map().config.layout === 'forest') {
+          <rect [attr.x]="x - s * 0.06" [attr.y]="y - s * 0.05" [attr.width]="s * 0.12" [attr.height]="s * 0.32" [attr.fill]="colors().trunk" />
+          <circle [attr.cx]="x" [attr.cy]="y - s * 0.14" [attr.r]="s * 0.3" [attr.fill]="colors().tree" [attr.stroke]="colors().ink" [attr.stroke-width]="s * 0.05" />
+        } @else {
+          <circle [attr.cx]="x" [attr.cy]="y" [attr.r]="s * 0.3" [attr.fill]="colors().pillar" [attr.stroke]="colors().ink" [attr.stroke-width]="s * 0.06" />
+        }
+      } @else if (k === 'road') {
+        <rect [attr.x]="x - s * 0.4" [attr.y]="y - s * 0.4" [attr.width]="s * 0.8" [attr.height]="s * 0.8" [attr.fill]="colors().road" [attr.stroke]="colors().ink" [attr.stroke-width]="s * 0.06" />
+        <line [attr.x1]="x - s * 0.28" [attr.x2]="x + s * 0.28" [attr.y1]="y" [attr.y2]="y" [attr.stroke]="colors().inkSoft" [attr.stroke-width]="s * 0.07" stroke-dasharray="4 3" />
       } @else if (k === 'hazard') {
         <rect [attr.x]="x - s * 0.4" [attr.y]="y - s * 0.4" [attr.width]="s * 0.8" [attr.height]="s * 0.8" [attr.fill]="colors().hazard" [attr.stroke]="colors().ink" [attr.stroke-width]="s * 0.06" />
       }
@@ -58,6 +71,7 @@
     <path [attr.d]="geo().hatch" fill="none" [attr.stroke]="colors().hatch" stroke-width="1" />
     <path [attr.d]="geo().floor" [attr.fill]="colors().floor" />
     <path [attr.d]="geo().corridor" [attr.fill]="colors().corridor" />
+    <path [attr.d]="geo().road" [attr.fill]="colors().road" />
     <path [attr.d]="geo().hazard" [attr.fill]="colors().hazard" />
     <path [attr.d]="geo().waves" fill="none" [attr.stroke]="colors().inkSoft" stroke-width="1.3" />
 
@@ -90,9 +104,21 @@
       <text [attr.x]="e.x + legend().icon / 2 + C * 0.25" [attr.y]="e.y" dominant-baseline="central" [attr.font-size]="C * 0.38" [attr.fill]="colors().ink">{{ e.label }}</text>
     }
   </svg>
+
+  @if (menu(); as m) {
+    <div class="menu-backdrop" (click)="closeMenu()" (contextmenu)="closeMenu(); $event.preventDefault()"></div>
+    <div class="map-menu" [style.left.px]="m.x" [style.top.px]="m.y" (click)="$event.stopPropagation()">
+      @for (t of manualMarkers; track t) {
+        <button type="button" [disabled]="!menuCan(t)" (click)="choose(t)">
+          {{ menuHas(t) ? 'Remover' : 'Adicionar' }} {{ manualLabel(t) }}
+        </button>
+      }
+    </div>
+  }
 </section>
 
 <section class="legend">
   1 quadrado = 5 pés (1,5 m) · {{ themeData().name }} · seed {{ map().config.seed }}
   @if (summary()) { · {{ summary() }} }
+  · Botão direito num quadrado: encontro · acampamento · tesouro · armadilha
 </section>

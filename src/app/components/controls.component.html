@@ -1,8 +1,9 @@
 <section class="controls">
   <label>Tipo
-    <select [ngModel]="options().layout" (ngModelChange)="patch('layout', $event)">
+    <select [ngModel]="options().layout" (ngModelChange)="onLayoutChange($event)">
       <option value="dungeon">Masmorra</option>
       <option value="cave">Caverna</option>
+      <option value="forest">Floresta</option>
     </select>
   </label>
 
@@ -22,13 +23,16 @@
   </label>
 
   <label>Salas
-    <input type="number" min="1" max="60" [disabled]="isCave()" [ngModel]="options().rooms" (ngModelChange)="patch('rooms', $event)" />
+    <input type="number" min="1" max="60" [disabled]="noRooms()" [ngModel]="options().rooms" (ngModelChange)="patch('rooms', $event)" />
   </label>
   <label>Portas secretas
-    <input type="number" min="0" max="20" [disabled]="isCave()" [ngModel]="options().secrets" (ngModelChange)="patch('secrets', $event)" />
+    <input type="number" min="0" max="20" [disabled]="noRooms()" [ngModel]="options().secrets" (ngModelChange)="patch('secrets', $event)" />
   </label>
   <label>Portas trancadas
-    <input type="number" min="0" max="30" [disabled]="isCave()" [ngModel]="options().locked_doors" (ngModelChange)="patch('locked_doors', $event)" />
+    <input type="number" min="0" max="30" [disabled]="noRooms()" [ngModel]="options().locked_doors" (ngModelChange)="patch('locked_doors', $event)" />
+  </label>
+  <label>Saídas da estrada
+    <input type="number" min="2" max="6" [disabled]="!isForest()" [ngModel]="options().exits" (ngModelChange)="patch('exits', $event)" />
   </label>
 
   <label>Perigo (%)
@@ -72,7 +76,7 @@
   </label>
   <label class="check">
     <input type="checkbox" [ngModel]="options().pillars" (ngModelChange)="patch('pillars', $event)" />
-    {{ isCave() ? 'Estalagmites' : 'Pilares' }}
+    {{ pillarLabel() }}
   </label>
   <label class="check">
     <input type="checkbox" [ngModel]="options().grid" (ngModelChange)="patch('grid', $event)" /> Grade
