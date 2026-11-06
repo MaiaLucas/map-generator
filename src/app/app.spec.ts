@@ -19,6 +19,13 @@ describe('App', () => {
     const fixture = TestBed.createComponent(App);
     await fixture.whenStable();
     const compiled = fixture.nativeElement as HTMLElement;
-    expect(compiled.querySelector('h1')?.textContent).toContain('Hello, map-generator');
+    expect(compiled.querySelector('h1')?.textContent).toContain('Gerador de Mapas');
+  });
+
+  it('should render the map svg', async () => {
+    const fixture = TestBed.createComponent(App);
+    await fixture.whenStable();
+    const compiled = fixture.nativeElement as HTMLElement;
+    expect(compiled.querySelector('app-dungeon-map svg')).toBeTruthy();
   });
 });

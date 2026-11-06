@@ -1,0 +1,83 @@
+<section class="controls">
+  <label>Tipo
+    <select [ngModel]="options().layout" (ngModelChange)="patch('layout', $event)">
+      <option value="dungeon">Masmorra</option>
+      <option value="cave">Caverna</option>
+    </select>
+  </label>
+
+  <label>Tema
+    <select [ngModel]="options().theme" (ngModelChange)="patch('theme', $event)">
+      @for (t of themes; track t.id) {
+        <option [value]="t.id">{{ t.name }}</option>
+      }
+    </select>
+  </label>
+
+  <label>Colunas
+    <input type="number" min="16" max="150" [ngModel]="options().width" (ngModelChange)="patch('width', $event)" />
+  </label>
+  <label>Linhas
+    <input type="number" min="16" max="150" [ngModel]="options().height" (ngModelChange)="patch('height', $event)" />
+  </label>
+
+  <label>Salas
+    <input type="number" min="1" max="60" [disabled]="isCave()" [ngModel]="options().rooms" (ngModelChange)="patch('rooms', $event)" />
+  </label>
+  <label>Portas secretas
+    <input type="number" min="0" max="20" [disabled]="isCave()" [ngModel]="options().secrets" (ngModelChange)="patch('secrets', $event)" />
+  </label>
+  <label>Portas trancadas
+    <input type="number" min="0" max="30" [disabled]="isCave()" [ngModel]="options().locked_doors" (ngModelChange)="patch('locked_doors', $event)" />
+  </label>
+
+  <label>Perigo (%)
+    <input type="number" min="0" max="100" [ngModel]="options().danger" (ngModelChange)="patch('danger', $event)" />
+  </label>
+  <label>Armadilhas
+    <input type="number" min="0" max="60" [ngModel]="options().traps" (ngModelChange)="patch('traps', $event)" />
+  </label>
+
+  <label>Jogadores
+    <input type="number" min="1" max="10" [ngModel]="options().group" (ngModelChange)="patch('group', $event)" />
+  </label>
+  <label>Nível
+    <input type="number" min="1" max="20" [ngModel]="options().level" (ngModelChange)="patch('level', $event)" />
+  </label>
+  <label>Dificuldade
+    <select [ngModel]="options().difficulty" (ngModelChange)="patch('difficulty', $event)">
+      <option value="easy">Fácil</option>
+      <option value="medium">Média</option>
+      <option value="hard">Difícil</option>
+      <option value="deadly">Mortal</option>
+    </select>
+  </label>
+
+  <label>Visão
+    <select [ngModel]="options().view" (ngModelChange)="patch('view', $event)">
+      <option value="dm">Mestre</option>
+      <option value="player">Jogadores</option>
+    </select>
+  </label>
+
+  <label>Seed
+    <input type="number" min="0" [ngModel]="options().seed" (ngModelChange)="patch('seed', $event)" />
+  </label>
+
+  <label class="check">
+    <input type="checkbox" [ngModel]="options().encounters" (ngModelChange)="patch('encounters', $event)" /> Encontros
+  </label>
+  <label class="check">
+    <input type="checkbox" [ngModel]="options().chest" (ngModelChange)="patch('chest', $event)" /> Baú
+  </label>
+  <label class="check">
+    <input type="checkbox" [ngModel]="options().pillars" (ngModelChange)="patch('pillars', $event)" />
+    {{ isCave() ? 'Estalagmites' : 'Pilares' }}
+  </label>
+  <label class="check">
+    <input type="checkbox" [ngModel]="options().grid" (ngModelChange)="patch('grid', $event)" /> Grade
+  </label>
+
+  <button (click)="generate.emit()">Gerar</button>
+  <button (click)="reroll.emit()">Nova seed</button>
+</section>

@@ -1,0 +1,98 @@
+<section class="map">
+  <svg
+    [attr.width]="svgWidth()"
+    [attr.height]="svgHeight()"
+    [attr.viewBox]="'0 0 ' + svgWidth() + ' ' + svgHeight()"
+    xmlns="http://www.w3.org/2000/svg"
+    font-family="system-ui, sans-serif"
+  >
+    <!-- Ícones reutilizados no mapa e na legenda -->
+    <ng-template #icon let-k="kind" let-x="x" let-y="y" let-v="vertical" let-n="value" let-s="size">
+      @if (k === 'door' || k === 'locked_door') {
+        <rect
+          [attr.x]="x - (v ? s * 0.15 : s * 0.41)"
+          [attr.y]="y - (v ? s * 0.41 : s * 0.15)"
+          [attr.width]="v ? s * 0.3 : s * 0.82"
+          [attr.height]="v ? s * 0.82 : s * 0.3"
+          [attr.fill]="colors().door"
+          [attr.stroke]="colors().ink"
+          [attr.stroke-width]="s * 0.06"
+        />
+        @if (k === 'locked_door') {
+          <circle [attr.cx]="x" [attr.cy]="y" [attr.r]="s * 0.08" fill="#f0d678" [attr.stroke]="colors().ink" [attr.stroke-width]="s * 0.05" />
+        }
+      } @else if (k === 'secret') {
+        <text [attr.x]="x" [attr.y]="y" text-anchor="middle" dominant-baseline="central" [attr.font-size]="s * 0.62" font-weight="700" [attr.fill]="colors().ink">S</text>
+      } @else if (k === 'stairs_up' || k === 'stairs_down') {
+        <rect [attr.x]="x - s * 0.4" [attr.y]="y - s * 0.4" [attr.width]="s * 0.8" [attr.height]="s * 0.8" [attr.fill]="colors().stairs" [attr.stroke]="colors().ink" [attr.stroke-width]="s * 0.06" />
+        @for (i of [1, 2, 3]; track i) {
+          <line [attr.x1]="x - s * 0.4" [attr.x2]="x + s * 0.4" [attr.y1]="y - s * 0.4 + (s * 0.8 * i) / 4" [attr.y2]="y - s * 0.4 + (s * 0.8 * i) / 4" [attr.stroke]="colors().inkMid" [attr.stroke-width]="s * 0.03" />
+        }
+        <polygon [attr.points]="triangle(k === 'stairs_up', x, y, s)" [attr.fill]="colors().ink" />
+      } @else if (k === 'chest') {
+        <rect [attr.x]="x - s * 0.28" [attr.y]="y - s * 0.19" [attr.width]="s * 0.56" [attr.height]="s * 0.38" [attr.fill]="colors().door" [attr.stroke]="colors().ink" [attr.stroke-width]="s * 0.06" />
+        <line [attr.x1]="x - s * 0.28" [attr.x2]="x + s * 0.28" [attr.y1]="y - s * 0.06" [attr.y2]="y - s * 0.06" [attr.stroke]="colors().ink" [attr.stroke-width]="s * 0.05" />
+        <rect [attr.x]="x - s * 0.04" [attr.y]="y - s * 0.09" [attr.width]="s * 0.08" [attr.height]="s * 0.1" fill="#f0d678" />
+      } @else if (k === 'trap') {
+        <path
+          [attr.d]="'M' + (x - s * 0.22) + ' ' + (y - s * 0.22) + 'L' + (x + s * 0.22) + ' ' + (y + s * 0.22) + 'M' + (x + s * 0.22) + ' ' + (y - s * 0.22) + 'L' + (x - s * 0.22) + ' ' + (y + s * 0.22)"
+          stroke="rgb(150,30,30)"
+          [attr.stroke-width]="s * 0.1"
+          stroke-linecap="round"
+          fill="none"
+        />
+      } @else if (k === 'encounter') {
+        <circle [attr.cx]="x" [attr.cy]="y" [attr.r]="s * 0.32" fill="rgba(160,40,40,0.92)" [attr.stroke]="colors().ink" [attr.stroke-width]="s * 0.06" />
+        @if (n !== undefined && n !== null) {
+          <text [attr.x]="x" [attr.y]="y" text-anchor="middle" dominant-baseline="central" [attr.font-size]="s * 0.4" font-weight="700" fill="#fff">{{ n }}</text>
+        }
+      } @else if (k === 'pillar') {
+        <circle [attr.cx]="x" [attr.cy]="y" [attr.r]="s * 0.3" [attr.fill]="colors().pillar" [attr.stroke]="colors().ink" [attr.stroke-width]="s * 0.06" />
+      } @else if (k === 'hazard') {
+        <rect [attr.x]="x - s * 0.4" [attr.y]="y - s * 0.4" [attr.width]="s * 0.8" [attr.height]="s * 0.8" [attr.fill]="colors().hazard" [attr.stroke]="colors().ink" [attr.stroke-width]="s * 0.06" />
+      }
+    </ng-template>
+
+    <rect [attr.width]="svgWidth()" [attr.height]="svgHeight()" [attr.fill]="colors().background" />
+
+    <path [attr.d]="geo().hatch" fill="none" [attr.stroke]="colors().hatch" stroke-width="1" />
+    <path [attr.d]="geo().floor" [attr.fill]="colors().floor" />
+    <path [attr.d]="geo().corridor" [attr.fill]="colors().corridor" />
+    <path [attr.d]="geo().hazard" [attr.fill]="colors().hazard" />
+    <path [attr.d]="geo().waves" fill="none" [attr.stroke]="colors().inkSoft" stroke-width="1.3" />
+
+    @if (showGrid()) {
+      <path [attr.d]="geo().grid" fill="none" [attr.stroke]="colors().grid" stroke-width="1" />
+    }
+    <path [attr.d]="geo().walls" fill="none" [attr.stroke]="colors().ink" stroke-width="2.9" stroke-linecap="square" />
+
+    @for (r of rooms(); track r.id) {
+      <text [attr.x]="r.x" [attr.y]="r.y" text-anchor="middle" [attr.font-size]="C * 0.4" font-weight="700" [attr.fill]="colors().inkMid">{{ r.id }}</text>
+    }
+
+    @for (p of geo().pillars; track $index) {
+      <ng-container [ngTemplateOutlet]="icon" [ngTemplateOutletContext]="{ kind: 'pillar', x: p.x, y: p.y, size: C }" />
+    }
+    @for (p of geo().secrets; track $index) {
+      <ng-container [ngTemplateOutlet]="icon" [ngTemplateOutletContext]="{ kind: 'secret', x: p.x, y: p.y, size: C }" />
+    }
+    @for (s of spots(); track $index) {
+      <ng-container [ngTemplateOutlet]="icon" [ngTemplateOutletContext]="{ kind: s.kind, x: s.x, y: s.y, vertical: s.vertical, value: s.value, size: C }" />
+    }
+
+    <!-- Legenda -->
+    <line x1="0" [attr.x2]="svgWidth()" [attr.y1]="map().height * C" [attr.y2]="map().height * C" [attr.stroke]="colors().ink" stroke-width="2.9" />
+    @for (e of legend().entries; track $index) {
+      <ng-container
+        [ngTemplateOutlet]="icon"
+        [ngTemplateOutletContext]="{ kind: e.kind, x: e.x, y: e.y, vertical: true, value: e.kind === 'encounter' ? 3 : undefined, size: legend().icon }"
+      />
+      <text [attr.x]="e.x + legend().icon / 2 + C * 0.25" [attr.y]="e.y" dominant-baseline="central" [attr.font-size]="C * 0.38" [attr.fill]="colors().ink">{{ e.label }}</text>
+    }
+  </svg>
+</section>
+
+<section class="legend">
+  1 quadrado = 5 pés (1,5 m) · {{ themeData().name }} · seed {{ map().config.seed }}
+  @if (summary()) { · {{ summary() }} }
+</section>

@@ -1,59 +1,39 @@
-# MapGenerator
+# Dungeon Map Generator
 
-This project was generated using [Angular CLI](https://github.com/angular/angular-cli) version 22.2.6.
+Gerador de mapas procedurais de dungeons em estilo masmorra de pedra para jogos de RPG.
 
-## Development server
+## Funcionalidades
 
-To start a local development server, run:
+- **Geração procedural**: Cria mapas aleatórios com seed determinista para replayabilidade
+- **Controles**: Defina quantidade de salas, salas secretas e encontros
+- **Conectividade linear**: Cada sala tem exatamente uma entrada e saída (exceto secretas)
+- **Portas**: Representação visual nas paredes das conexões (trancadas/destrancadas)
+- **Estética visual**: Design com hachura 45°, tons de pedra, água e salas secretas em vermelho
 
-```bash
-ng serve
-```
+## Tecnologia
 
-Once the server is running, open your browser and navigate to `http://localhost:4200/`. The application will automatically reload whenever you modify any of the source files.
+- Angular Signals (reatividade)
+- SVG para renderização vetorial
+- TypeScript com padrões reativos
 
-## Code scaffolding
-
-Angular CLI includes powerful code scaffolding tools. To generate a new component, run:
-
-```bash
-ng generate component component-name
-```
-
-For a complete list of available schematics (such as `components`, `directives`, or `pipes`), run:
+## Uso
 
 ```bash
-ng generate --help
+npm start
 ```
 
-## Building
-
-To build the project run:
+Abra no navegador ou execute o dev server:
 
 ```bash
-ng build
+ng serve --port 4200
 ```
 
-This will compile your project and store the build artifacts in the `dist/` directory. By default, the production build optimizes your application for performance and speed.
+## Estrutura de componentes
 
-## Running unit tests
+- `app/` - Componente root e controles
+- `components/dungeon-generator.ts` - Lógica de geração procedural
+- `components/map-view.component.ts` - Renderização SVG com grades de tiles
 
-To execute unit tests with the [Vitest](https://vitest.dev/) test runner, use the following command:
+## Licença
 
-```bash
-ng test
-```
-
-## Running end-to-end tests
-
-For end-to-end (e2e) testing, run:
-
-```bash
-ng e2e
-```
-
-Angular CLI does not come with an end-to-end testing framework by default. You can choose one that suits your needs.
-
-## Additional Resources
-
-For more information on using the Angular CLI, including detailed command references, visit the [Angular CLI Overview and Command Reference](https://angular.dev/tools/cli) page.
+MIT
